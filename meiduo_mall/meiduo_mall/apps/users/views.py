@@ -6,8 +6,9 @@ from django.shortcuts import render
 from django.views import View
 from django_redis import get_redis_connection
 
-
-
+from django.core.mail import send_mail
+from django.conf import settings
+from celery_tasks.email.tasks import send_verify_email
 from django.http import JsonResponse
 
 import logging
@@ -133,7 +134,7 @@ class RegisterView(View):
             })
     # 处理数据 ,保存到MySQL
         try:
-            user = User.objects.create(username=username, mobile=mobile, password=password)
+            user = User.objects.create_user(username=username, mobile=mobile, password=password)
         except Exception as e:
             logger.error(e)
             print(e)
@@ -186,31 +187,31 @@ class LoginView(View):
             }
             )
         # 处理数据
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist as e:
-            try:
-                user = User.objects.get(mobile=username)
-            except User.DoesNotExist as e:
-                logger.error(e)
-                print(e)
-                return JsonResponse({
-                'code': 400,
-                'errmsg': '用户名错误'
-                })
-        if user.password != password:
-            return JsonResponse({
-                'code':400,
-                'errmsg': '密码错误',
-            })
-
-        # user = authenticate(request, username=username, password=password)
-        # # 构建响应
-        # if not user:
-        #     return JsonResponse({
+        # try:
+        #     user = User.objects.get(username=username)
+        # except User.DoesNotExist as e:
+        #     try:
+        #         user = User.objects.get(mobile=username)
+        #     except User.DoesNotExist as e:
+        #         logger.error(e)
+        #         print(e)
+        #         return JsonResponse({
         #         'code': 400,
-        #         'errmsg': '用户名或者密码有误'
+        #         'errmsg': '用户名错误'
+        #         })
+        # if user.password != password:
+        #     return JsonResponse({
+        #         'code':400,
+        #         'errmsg': '密码错误',
         #     })
+
+        user = authenticate(request, username=username, password=password)
+        # 构建响应
+        if not user:
+            return JsonResponse({
+                'code': 400,
+                'errmsg': '用户名或者密码有误'
+            })
 
         # 状态保持
         login(request, user)
@@ -268,3 +269,96 @@ class UserInfoView(View):
                 'email_active': user.email_active,
             }
         })
+
+
+
+#  添加邮箱后端接口
+class EmailView(View):
+    @method_decorator(login_required)
+    def put(self, request):
+        # 获取参数
+        dict = json.loads(request.body.decode())
+        email = dict.get('email')
+        # 校验参数
+        if not email:
+            return JsonResponse({
+                'code': 400,
+                'errmsg': '缺少参数，用户未提交email地址'
+            })
+        if not re.match(r'^^[a-z0-9][\w\.\-]*@[a-z0-9\-]+(\.[a-z]{2,5}){1,2}$', email):
+            return JsonResponse({
+                'code': 400,
+                'errmsg': '邮箱地址格式有误'
+            })
+        # 处理数据
+        # 将获得的值存入MySQL数据库
+        try:
+            request.user.email = email
+        except Exception as e:
+            logger.error(e)
+            return JsonResponse({
+                'code': 400,
+                'errmsg': '添加邮箱失败'
+            })
+        else:
+            request.user.save()
+
+
+        verify_url= request.user.generate_verify_email_url()
+        # 构建邮件验证
+        # 标题
+        subject = "美多商城邮箱验证"
+        # 发送内容:
+        html_message = '<p>尊敬的用户您好！</p>' \
+                       '<p>感谢您使用美多商城。</p>' \
+                       '<p>您的邮箱为：%s 。请点击此链接激活您的邮箱：</p>' \
+                       '<p><a href="%s">%s<a></p>' % (request.user.email, verify_url, verify_url)
+
+        # 进行发送
+        send_verify_email.delay(subject=subject,
+                    to_email=email,
+                   html_message=html_message)
+        # 构建返回
+        return JsonResponse({
+            'code': 0,
+            'errmsg': 'ok,邮箱添加成功'
+        })
+
+
+# 用户邮箱激活验证接口
+class VerifyEmailView(View):
+    def put(self, request):
+        # 接收参数
+        token = request.GET.get('token')
+        # 校验参数
+        if not token:
+            return JsonResponse({
+                'code': 400,
+                'errmsg': '缺少查询参数'
+            })
+
+        user = User.check_verify_email_token(token)
+        if not user:
+            return JsonResponse({
+                "code": 400,
+                'errmsg': '无效的token'
+            })
+        # 处理数据
+        try:
+            user.email_active = True
+            user.save()
+        except Exception as e:
+            logger.error(e)
+            return JsonResponse({
+                'code': 400,
+                'errmsg': '激活邮件失败'
+            })
+
+        # 构建响应
+        return JsonResponse({
+            'code': 0,
+            'errmsg': 'ok'
+        })
+
+
+
