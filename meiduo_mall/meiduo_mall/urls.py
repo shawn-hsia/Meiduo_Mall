@@ -18,7 +18,17 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # 用户相关
     path("", include("users.urls")),
+    # 认证相关
     path("", include("verifications.urls")),
+    # qq绑定认证相关
     path("", include("oauth.urls")),
+    # 收货地址相关
+    path('', include('areas.urls')),
+    # 首页内容及广告页
+    path("", include('contents.urls')),
+    # 商品相关
+    path("", include('goods.urls'))
+
 ]

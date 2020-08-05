@@ -58,6 +58,11 @@ INSTALLED_APPS = [
     'corsheaders',
     'verifications',
     'oauth',
+    'areas',
+    'contents',
+    'goods',
+    'django_crontab',
+
 
 
 
@@ -261,3 +266,18 @@ QQ_CLIENT_ID = '101474184'
 QQ_CLIENT_SECRET = 'c6ce949e04e12ecc909ae6a8b09b637c'
 # 我们申请时添加的: 登录成功后回调的路径
 QQ_REDIRECT_URI = 'http://www.meiduo.site:8080/oauth_callback.html'
+
+# 配置文件让django使用我们定义的类调用重写的方法
+DEFAULT_FILE_STORAGE = 'meiduo_mall.utils.fastdfs.fastdfs_storage.FastDFSStorage'
+
+# 自定义fdfs文件存储服务器的域名
+FDFS_URL = "http://image.meiduo.site:8888/"
+
+# 指定index渲染的front_end_pc的路径
+GENERATED_STATIC_HTML_FILES_DIR = os.path.join(os.path.dirname(BASE_DIR), 'front_end_pc')
+
+# 创建定时任务
+CRONJOBS = [
+    # 每1分钟生成一次首页静态文件
+    ('*/1 * * * *', 'contents.generate_index.generate_index_html', '>> ' + os.path.join(BASE_DIR, 'logs/crontab.log'))
+]

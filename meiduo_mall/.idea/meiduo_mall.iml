@@ -16,7 +16,7 @@
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/meiduo_mall/apps" isTestSource="false" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.6 (my_first_virtualenv)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.6 (django_38)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TemplatesService">
